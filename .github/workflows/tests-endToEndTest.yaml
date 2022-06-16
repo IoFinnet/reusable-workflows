@@ -1,0 +1,130 @@
+name: Tests E2E
+
+on:
+  workflow_call:
+    secrets:
+      GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY:
+        required: true
+      DEPLOY_ID:
+        required: true
+      DEPLOY_SECRET:
+        required: true
+      QA_SERVICE:
+        required: true
+      QA_ENDPOINT:
+        required: true
+
+    inputs:
+      region:
+        required: true
+        type: string
+      github-stage:
+        required: true
+        type: string
+      node-version:
+        default: "14.x"
+        required: false
+        type: string
+      slack-channel:
+        required: true
+        type: string
+      slack-token:
+        required: true
+        type: string
+
+jobs:
+  seed:
+    name: Seed the DB - ${{inputs.github-stage}} Environment
+    runs-on: ubuntu-latest
+    environment: "${{ inputs.github-stage }}"
+
+    steps:
+      # Seed the DB
+      - uses: actions/checkout@main
+        with:
+          repository: IoFinnet/io-core-cldsvc-seed
+          ref: main
+          token: ${{ secrets.GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY }}
+      - name: Add auth token into .npmrc
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${GH_TOKEN}" >> .npmrc
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY }}
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+      - name: Install node modules
+        # Caching disabled since it causes a criticl npm error
+        # (npm install failed with code 1)
+        run: npm ci --ignore-scripts
+      - name: Serverless authentication
+        run:
+          npx serverless config credentials --provider aws --key ${{secrets.DEPLOY_ID}}
+          --secret ${{secrets.DEPLOY_SECRET}}
+      - name: Run seed script for ${{inputs.github-stage}} database
+        run:
+          npx ts-node scripts/seed/seedDynamo.ts -t io-flow-cldsvc-accounts-flow-accounts-${{inputs.github-stage}} -f
+          ./seeds/io-core-cldsvc-qa/accounts.json -r ${{inputs.region}} && npx ts-node
+          scripts/seed/seedDynamo.ts -t io-flow-cldsvc-nium-plugin-vra-accounts-${{inputs.github-stage}} -f
+          ./seeds/io-core-cldsvc-qa/vraAccounts.json -r ${{inputs.region}} && npx ts-node
+          scripts/seed/seedDynamo.ts -t io-flow-cldsvc-nium-plugin-vra-transactions-${{inputs.github-stage}} -f
+          ./seeds/io-core-cldsvc-qa/vraTransactions.json -r ${{inputs.region}}
+
+  build:
+    needs: seed
+    name: Build and test
+    runs-on: ubuntu-latest
+
+    environment: "${{ inputs.github-stage }}"
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+      - name: Add auth token into .npmrc
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${GH_TOKEN}" >> .npmrc
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY }}
+
+      - name: Install node modules
+        run: npm ci --ignore-scripts
+      # Run linting, unit tests and offline integration tests
+      - name: Run lint
+        run: npm run lint
+      - name: Serverless authentication
+        run:
+          npx serverless config credentials --provider aws --key ${{secrets.DEPLOY_ID}}
+          --secret ${{secrets.DEPLOY_SECRET}}
+      
+      - name: Create default envfile - ${{inputs.github-stage}} Environment
+        run: |
+          touch ./envs/.env 
+          echo CURITY_SERVICE=${{ secrets.QA_SERVICE }} >> ./envs/.env
+          echo IO_ENDPOINT=${{ secrets.QA_ENDPOINT }} >> ./envs/.env
+          echo STAGE="${{inputs.github-stage}}" >> ./envs/.env
+      - name: Run oauth-token E2E test - ${{ inputs.stage }} Environment
+        if: always()
+        run: npm run test -- -t "@oauth and not (@ignore or @long-scenario)"
+      - name: Run Accounts E2E test - ${{ inputs.stage }} Environment
+        if: always()
+        run: npm run test -- -t "@accounts and not (@ignore or @long-scenario)"
+      - name: Run VRA E2E test - ${{ inputs.stage }} Environment
+        if: always()
+        run: npm run test -- -t "@vra and not (@ignore or @long-scenario)"
+      - name: Run VRA Transactions E2E test - ${{ inputs.stage }} Environment
+        if: always()
+        run: npm run test -- -t "@transactions and not (@ignore or @long-scenario)"
+
+      - name: Notify fail
+        if: failure()
+        uses: act10ns/slack@v1
+        env:
+          SLACK_WEBHOOK_URL: "${{inputs.slack-token}}"
+        with:
+          status: ${{ job.status }}
+          channel: "#${{ inputs.channel }}"
+          message: "Workflow failed on {{ env.GITHUB_REF_NAME }} in ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

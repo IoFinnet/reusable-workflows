@@ -1,0 +1,65 @@
+name: Build
+
+on:
+  workflow_call:
+    secrets:
+      GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY:
+        required: true
+      DEPLOY_ID:
+        required: true
+      DEPLOY_SECRET:
+        required: true
+
+    inputs:
+      node-version:
+        default: "14.x"
+        required: false
+        type: string
+      slack-channel:
+        required: true
+        type: string
+      slack-token:
+        required: true
+        type: string
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+
+      - name: Add auth token into .npmrc
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${GH_TOKEN}" >> .npmrc
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY }}
+      
+      - name: Install node modules
+        run: npm ci --ignore-scripts
+
+      # Run linting, unit tests and offline integration tests
+      - name: Run lint
+        run: npm run lint
+      - name: Run unit test
+        run: npm run test:unit
+      # Serverless auth
+      - name: Serverless authentication
+        run:
+          npx serverless config credentials --provider aws --key
+          ${{secrets.DEPLOY_ID}} --secret ${{secrets.DEPLOY_SECRET}}
+ 
+      - name: Notify fail
+        if: failure()
+        uses: act10ns/slack@v1
+        env:
+          SLACK_WEBHOOK_URL: "${{inputs.slack-token}}"
+        with:
+          status: ${{ job.status }}
+          channel: "#${{ inputs.channel }}"
+          message: "Workflow failed on {{ env.GITHUB_REF_NAME }} in ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

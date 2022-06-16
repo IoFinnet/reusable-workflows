@@ -1,0 +1,131 @@
+name: Tests vpc integration
+
+on:
+  workflow_call:
+
+    secrets:
+      GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY:
+        required: true
+      DEPLOY_ID:
+        required: true
+      DEPLOY_SECRET:
+        required: true
+      EC2_IMAGE:
+        required: true
+      SUBNET:
+        required: true
+      SECURITY_GROUP:
+        required: true
+       
+    inputs:
+      deployment-repo:
+        required: true
+        type: string
+      github-stage:
+        required: true
+        type: string
+      node-version:
+        default: "14.x"
+        required: false
+        type: string
+      region:
+        required: true
+        type: string
+      instance-type:
+        default: "t3.small"
+        required: false
+        type: string
+      slack-channel:
+        required: true
+        type: string
+      slack-token:
+        required: true
+        type: string
+
+jobs:
+  start-runner:
+    name: Start self-hosted EC2 runner
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.start-ec2-runner.outputs.label }}
+      ec2-instance-id: ${{ steps.start-ec2-runner.outputs.ec2-instance-id }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.DEPLOY_ID }}
+          aws-secret-access-key: ${{ secrets.DEPLOY_SECRET }}
+          aws-region: eu-west-1
+      - name: Start EC2 runner
+        id: start-ec2-runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY }}
+          ec2-instance-type: ${{inputs.instance-type}}
+          ec2-image-id: ${{secrets.EC2_IMAGE}}
+          subnet-id: ${{secrets.SUBNET}}
+          security-group-id: ${{secrets.SECURITY_GROUP}}
+
+  run-vpc-tests:
+    name: Do the job on the runner
+    needs: start-runner # required to start the main job when the runner is ready
+    runs-on: ${{ needs.start-runner.outputs.label }} # run the job on the newly created runner
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ inputs.deployment-repo }}
+
+      - name: Add auth token into .npmrc
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${GH_TOKEN}" >> .npmrc
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY }}
+
+      - name: Run install
+        run: npm install
+
+      # Serverless auth
+      - name: Serverless authentication
+        run:
+          npx serverless config credentials --provider aws --key
+          ${{secrets.DEPLOY_ID}} --secret ${{secrets.DEPLOY_SECRET}}
+
+      - name: VPC tests
+        run: ./.github/scripts/${{inputs.github-stage}}/vpc_tests.sh
+        env:
+          stage: ${{ inputs.github-stage }}
+          heap: ${{ inputs.heap-size }}
+
+      - name: Notify fail
+        if: failure()
+        uses: act10ns/slack@v1
+        env:
+          SLACK_WEBHOOK_URL: "${{inputs.slack-token}}"
+        with:
+          status: ${{ job.status }}
+          channel: "#${{ inputs.channel }}"
+          message: "Workflow failed on {{ env.GITHUB_REF_NAME }} in ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  stop-runner:
+    name: Stop self-hosted EC2 runner
+    needs:
+      - start-runner # required to get output from the start-runner job
+      - run-vpc-tests # required to wait when the main job is done
+    runs-on: ubuntu-latest
+    if: ${{ always() }} # required to stop the runner even if the error happened in the previous jobs
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.DEPLOY_ID }}
+          aws-secret-access-key: ${{ secrets.DEPLOY_SECRET }}
+          aws-region: eu-west-1
+      - name: Stop EC2 runner
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY }}
+          label: ${{ needs.start-runner.outputs.label }}
+          ec2-instance-id: ${{ needs.start-runner.outputs.ec2-instance-id }}

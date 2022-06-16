@@ -1,0 +1,84 @@
+name: Deploy
+
+on:
+  workflow_call:
+    secrets:
+      GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY:
+        required: true
+      DEPLOY_ID:
+        required: true
+      DEPLOY_SECRET:
+        required: true
+
+    inputs:
+      deployment-repo:
+        required: true
+        type: string
+      github-stage:
+        required: true
+        type: string
+      heap-size:
+        default: "6144"
+        required: false
+        type: string
+      node-version:
+        default: "14.x"
+        required: false
+        type: string
+      region:
+        required: true
+        type: string
+      slack-channel:
+        required: true
+        type: string
+      slack-token:
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: "${{ inputs.github-stage }}"
+
+    steps:
+      # Release with semantic tag like v1.0.3
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.deployment-repo }}
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+
+      - name: Add auth token into .npmrc
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${GH_TOKEN}" >> .npmrc
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY }}
+
+      # Serverless auth
+      - name: Serverless authentication
+        run:
+          npx serverless config credentials --provider aws --key
+          ${{secrets.DEPLOY_ID}} --secret ${{secrets.DEPLOY_SECRET}}
+
+      - name: Install node modules
+        run: npm ci --ignore-scripts
+
+      - name: Deploy
+        run: ./.github/scripts/${{inputs.github-stage}}/deploy.sh
+        env:
+          stage: ${{ inputs.github-stage }}
+          heap: ${{ inputs.heap-size }}
+
+      - name: Notify fail
+        if: failure()
+        uses: act10ns/slack@v1
+        env:
+          SLACK_WEBHOOK_URL: "${{inputs.slack-token}}"
+        with:
+          status: ${{ job.status }}
+          channel: "#${{ inputs.channel }}"
+          message: "Workflow failed on {{ env.GITHUB_REF_NAME }} in ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
