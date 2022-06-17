@@ -21,6 +21,10 @@ on:
       slack-token:
         required: true
         type: string
+      unit-tests:
+        default: ""
+        required: false
+        type: string
 
 jobs:
   build:
@@ -47,7 +51,12 @@ jobs:
       - name: Run lint
         run: npm run lint
       - name: Run unit test
-        run: npm run test:unit
+        run: |
+          if [ "$tests" != "" ]; then
+          npm run test:unit
+        env:
+          tests: ${{ inputs.unit-tests }}
+
       # Serverless auth
       - name: Serverless authentication
         run:
