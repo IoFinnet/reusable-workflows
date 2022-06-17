@@ -54,6 +54,7 @@ jobs:
         run: |
           if [ "$tests" != "" ]; then
           npm run test:unit
+          fi
         env:
           tests: ${{ inputs.unit-tests }}
 
