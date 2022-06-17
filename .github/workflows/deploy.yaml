@@ -67,6 +67,12 @@ jobs:
       - name: Install node modules
         run: npm ci --ignore-scripts
 
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run unit test
+        run: npm run test:unit
+
       - name: Deploy
         run: ./.github/scripts/${{inputs.github-stage}}/deploy.sh
         env:
