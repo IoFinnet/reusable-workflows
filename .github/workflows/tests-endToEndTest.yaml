@@ -1,4 +1,4 @@
-name: Tests E2E
+name: e2e
 
 on:
   workflow_call:
@@ -30,6 +30,10 @@ on:
         type: string
       slack-token:
         required: true
+        type: string
+      heap-size:
+        default: "6144"
+        required: false
         type: string
 
 jobs:
@@ -64,12 +68,15 @@ jobs:
           --secret ${{secrets.DEPLOY_SECRET}}
       - name: Run seed script for ${{inputs.github-stage}} database
         run:
+          npx ts-node scripts/seed/seedDynamo.ts -t io-flow-cldsvc-nium-plugin-vra-accounts-${{inputs.github-stage}} -f 
+          ./seeds/io-core-cldsvc-qa/vraAccounts.json -r eu-west-1 &&
+          npx ts-node scripts/seed/seedDynamo.ts -t io-flow-cldsvc-accounts-virtual-accounts-${{inputs.github-stage}} -f
+          ./seeds/io-core-cldsvc-qa/flowVirtualAccounts.json -r eu-west-1 &&
           npx ts-node scripts/seed/seedDynamo.ts -t io-flow-cldsvc-accounts-flow-accounts-${{inputs.github-stage}} -f
-          ./seeds/io-core-cldsvc-qa/accounts.json -r ${{inputs.region}} && npx ts-node
-          scripts/seed/seedDynamo.ts -t io-flow-cldsvc-nium-plugin-vra-accounts-${{inputs.github-stage}} -f
-          ./seeds/io-core-cldsvc-qa/vraAccounts.json -r ${{inputs.region}} && npx ts-node
-          scripts/seed/seedDynamo.ts -t io-flow-cldsvc-nium-plugin-vra-transactions-${{inputs.github-stage}} -f
-          ./seeds/io-core-cldsvc-qa/vraTransactions.json -r ${{inputs.region}}
+          ./seeds/io-core-cldsvc-qa/accounts.json -r eu-west-1 &&
+          npx ts-node scripts/seed/seedDynamo.ts -t io-flow-cldsvc-nium-plugin-vra-transactions-${{inputs.github-stage}}  -f 
+          ./seeds/io-core-cldsvc-qa/vraTransactions.json -r eu-west-1
+
 
   build:
     needs: seed
@@ -79,7 +86,11 @@ jobs:
     environment: "${{ inputs.github-stage }}"
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@master
+        with:
+          repository: IoFinnet/io-core-cldsvc-qa
+          ref: master
+          token: ${{ secrets.GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY }}
       - uses: actions/setup-node@v3
         with:
           node-version: ${{ inputs.node-version }}
@@ -103,19 +114,19 @@ jobs:
       - name: Create default envfile - ${{inputs.github-stage}} Environment
         run: |
           touch ./envs/.env 
-          echo CURITY_SERVICE=${{ secrets.QA_SERVICE }} >> ./envs/.env
+          echo COGNITO_SERVICE=${{ secrets.QA_SERVICE }} >> ./envs/.env
           echo IO_ENDPOINT=${{ secrets.QA_ENDPOINT }} >> ./envs/.env
           echo STAGE="${{inputs.github-stage}}" >> ./envs/.env
       - name: Run oauth-token E2E test - ${{ inputs.stage }} Environment
         if: always()
         run: npm run test -- -t "@oauth and not (@ignore or @long-scenario)"
-      - name: Run Accounts E2E test - ${{ inputs.stage }} Environment
+      - name: Run Accounts E2E test - ${{ inputs.github-stage }} Environment
         if: always()
         run: npm run test -- -t "@accounts and not (@ignore or @long-scenario)"
-      - name: Run VRA E2E test - ${{ inputs.stage }} Environment
+      - name: Run VRA E2E test - ${{ inputs.github-stage }} Environment
         if: always()
         run: npm run test -- -t "@vra and not (@ignore or @long-scenario)"
-      - name: Run VRA Transactions E2E test - ${{ inputs.stage }} Environment
+      - name: Run VRA Transactions E2E test - ${{ inputs.github-stage }} Environment
         if: always()
         run: npm run test -- -t "@transactions and not (@ignore or @long-scenario)"
 
