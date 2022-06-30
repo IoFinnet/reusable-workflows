@@ -76,6 +76,7 @@ jobs:
           stage: ${{ inputs.github-stage }}
           heap: ${{ inputs.heap-size }}
           region: ${{ inputs.region }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY }}
 
       - name: Notify fail
         if: failure()
