@@ -48,12 +48,12 @@ jobs:
           ref: ${{ inputs.deployment-repo }}
       - name: GitHub Refs
         uses: rlespinasse/github-slug-action@v4.x
-      - id: branch_lower
+      - id: string
         uses: ASzc/change-string-case-action@v2
         with:
           string: ${{ $GITHUB_REF_SLUG_URL }}
       - id: step2
-        run: echo ${{ branch_lower.string.outputs.lowercase }}
+        run: echo ${{ string.string.outputs.lowercase }}
       - uses: actions/setup-node@v3
         with:
           node-version: ${{ inputs.node-version }}
