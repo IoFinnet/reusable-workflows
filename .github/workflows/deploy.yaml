@@ -51,7 +51,7 @@ jobs:
       - id: string
         uses: ASzc/change-string-case-action@v2
         with:
-          string: ${{ $GITHUB_REF_SLUG_URL }}
+          string: ${{ env.GITHUB_REF_SLUG_URL }}
       - id: step2
         run: echo ${{ string.string.outputs.lowercase }}
       - uses: actions/setup-node@v3
@@ -81,7 +81,7 @@ jobs:
         if: ${{ inputs.github-stage == 'temporary' }}
         run: ./.github/scripts/temp/deploy.sh
         env:
-          stage: ${{ branch_lower.string.outputs.lowercase }}
+          stage: ${{ steps.string.outputs.lowercase }}
           heap: ${{ inputs.heap-size }}
           region: ${{ inputs.region }}
           GH_TOKEN: ${{ secrets.GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY }}
