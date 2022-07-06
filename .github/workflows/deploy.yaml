@@ -53,7 +53,7 @@ jobs:
         with:
           string: ${{ env.GITHUB_REF_SLUG_URL }}
       - id: step2
-        run: echo ${{ string.string.outputs.lowercase }}
+        run: echo ${{ steps.string.outputs.lowercase }}
       - uses: actions/setup-node@v3
         with:
           node-version: ${{ inputs.node-version }}
