@@ -52,8 +52,6 @@ jobs:
         uses: ASzc/change-string-case-action@v2
         with:
           string: ${{ env.GITHUB_REF_SLUG_URL }}
-      - id: step2
-        run: echo ${{ steps.string.outputs.lowercase }}
       - uses: actions/setup-node@v3
         with:
           node-version: ${{ inputs.node-version }}
