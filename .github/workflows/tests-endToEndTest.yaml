@@ -80,7 +80,7 @@ jobs:
 
   oauthTokenTest:
     needs: seed
-    name: Build and test
+    name: run oAuth Tests
     runs-on: ubuntu-latest
 
     environment: "${{ inputs.github-stage }}"
@@ -123,7 +123,7 @@ jobs:
 
   accountsTest:
     needs: seed
-    name: Build and test
+    name: run accounts Tests
     runs-on: ubuntu-latest
 
     environment: "${{ inputs.github-stage }}"
@@ -166,7 +166,7 @@ jobs:
         
   vraTest:
     needs: seed
-    name: Build and test
+    name: run vra Tests
     runs-on: ubuntu-latest
 
     environment: "${{ inputs.github-stage }}"
@@ -209,7 +209,7 @@ jobs:
 
   transactionsTest:
     needs: seed
-    name: Build and test
+    name: run transactions Tests
     runs-on: ubuntu-latest
 
     environment: "${{ inputs.github-stage }}"
@@ -252,7 +252,7 @@ jobs:
 
   payoutsTest:
     needs: seed
-    name: Build and test
+    name: run payouts Tests
     runs-on: ubuntu-latest
 
     environment: "${{ inputs.github-stage }}"
