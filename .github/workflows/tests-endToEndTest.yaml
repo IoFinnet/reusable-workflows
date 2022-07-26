@@ -250,7 +250,7 @@ jobs:
         if: always()
         run: npm run test -- -t "@transactions and not (@ignore or @long-scenario)"
 
-payoutsTest:
+  payoutsTest:
     needs: seed
     name: Build and test
     runs-on: ubuntu-latest
