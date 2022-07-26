@@ -78,9 +78,9 @@ jobs:
           ./seeds/io-core-cldsvc-qa/vraTransactions.json -r eu-west-1
 
 
-  build:
+  oauthTokenTest:
     needs: seed
-    name: Build and test
+    name: run oAuth Tests
     runs-on: ubuntu-latest
 
     environment: "${{ inputs.github-stage }}"
@@ -120,16 +120,184 @@ jobs:
       - name: Run oauth-token E2E test - ${{ inputs.stage }} Environment
         if: always()
         run: npm run test -- -t "@oauth and not (@ignore or @long-scenario)"
+
+  accountsTest:
+    needs: seed
+    name: run accounts Tests
+    runs-on: ubuntu-latest
+
+    environment: "${{ inputs.github-stage }}"
+
+    steps:
+      - uses: actions/checkout@master
+        with:
+          repository: IoFinnet/io-core-cldsvc-qa
+          ref: master
+          token: ${{ secrets.GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY }}
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+      - name: Add auth token into .npmrc
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${GH_TOKEN}" >> .npmrc
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY }}
+
+      - name: Install node modules
+        run: npm ci --ignore-scripts
+      # Run linting, unit tests and offline integration tests
+      - name: Run lint
+        run: npm run lint
+      - name: Serverless authentication
+        run:
+          npx serverless config credentials --provider aws --key ${{secrets.DEPLOY_ID}}
+          --secret ${{secrets.DEPLOY_SECRET}}
+      
+      - name: Create default envfile - ${{inputs.github-stage}} Environment
+        run: |
+          touch ./envs/.env 
+          echo COGNITO_SERVICE=${{ secrets.QA_SERVICE }} >> ./envs/.env
+          echo IO_ENDPOINT=${{ secrets.QA_ENDPOINT }} >> ./envs/.env
+          echo STAGE="${{inputs.github-stage}}" >> ./envs/.env
       - name: Run Accounts E2E test - ${{ inputs.github-stage }} Environment
         if: always()
         run: npm run test -- -t "@accounts and not (@ignore or @long-scenario)"
+        
+  vraTest:
+    needs: seed
+    name: run vra Tests
+    runs-on: ubuntu-latest
+
+    environment: "${{ inputs.github-stage }}"
+
+    steps:
+      - uses: actions/checkout@master
+        with:
+          repository: IoFinnet/io-core-cldsvc-qa
+          ref: master
+          token: ${{ secrets.GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY }}
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+      - name: Add auth token into .npmrc
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${GH_TOKEN}" >> .npmrc
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY }}
+
+      - name: Install node modules
+        run: npm ci --ignore-scripts
+      # Run linting, unit tests and offline integration tests
+      - name: Run lint
+        run: npm run lint
+      - name: Serverless authentication
+        run:
+          npx serverless config credentials --provider aws --key ${{secrets.DEPLOY_ID}}
+          --secret ${{secrets.DEPLOY_SECRET}}
+      
+      - name: Create default envfile - ${{inputs.github-stage}} Environment
+        run: |
+          touch ./envs/.env 
+          echo COGNITO_SERVICE=${{ secrets.QA_SERVICE }} >> ./envs/.env
+          echo IO_ENDPOINT=${{ secrets.QA_ENDPOINT }} >> ./envs/.env
+          echo STAGE="${{inputs.github-stage}}" >> ./envs/.env
       - name: Run VRA E2E test - ${{ inputs.github-stage }} Environment
         if: always()
         run: npm run test -- -t "@vra and not (@ignore or @long-scenario)"
+
+  transactionsTest:
+    needs: seed
+    name: run transactions Tests
+    runs-on: ubuntu-latest
+
+    environment: "${{ inputs.github-stage }}"
+
+    steps:
+      - uses: actions/checkout@master
+        with:
+          repository: IoFinnet/io-core-cldsvc-qa
+          ref: master
+          token: ${{ secrets.GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY }}
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+      - name: Add auth token into .npmrc
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${GH_TOKEN}" >> .npmrc
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY }}
+
+      - name: Install node modules
+        run: npm ci --ignore-scripts
+      # Run linting, unit tests and offline integration tests
+      - name: Run lint
+        run: npm run lint
+      - name: Serverless authentication
+        run:
+          npx serverless config credentials --provider aws --key ${{secrets.DEPLOY_ID}}
+          --secret ${{secrets.DEPLOY_SECRET}}
+      
+      - name: Create default envfile - ${{inputs.github-stage}} Environment
+        run: |
+          touch ./envs/.env 
+          echo COGNITO_SERVICE=${{ secrets.QA_SERVICE }} >> ./envs/.env
+          echo IO_ENDPOINT=${{ secrets.QA_ENDPOINT }} >> ./envs/.env
+          echo STAGE="${{inputs.github-stage}}" >> ./envs/.env
       - name: Run VRA Transactions E2E test - ${{ inputs.github-stage }} Environment
         if: always()
         run: npm run test -- -t "@transactions and not (@ignore or @long-scenario)"
 
+  payoutsTest:
+    needs: seed
+    name: run payouts Tests
+    runs-on: ubuntu-latest
+
+    environment: "${{ inputs.github-stage }}"
+
+    steps:
+      - uses: actions/checkout@master
+        with:
+          repository: IoFinnet/io-core-cldsvc-qa
+          ref: master
+          token: ${{ secrets.GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY }}
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm'
+      - name: Add auth token into .npmrc
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${GH_TOKEN}" >> .npmrc
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY }}
+
+      - name: Install node modules
+        run: npm ci --ignore-scripts
+      # Run linting, unit tests and offline integration tests
+      - name: Run lint
+        run: npm run lint
+      - name: Serverless authentication
+        run:
+          npx serverless config credentials --provider aws --key ${{secrets.DEPLOY_ID}}
+          --secret ${{secrets.DEPLOY_SECRET}}
+      
+      - name: Create default envfile - ${{inputs.github-stage}} Environment
+        run: |
+          touch ./envs/.env 
+          echo COGNITO_SERVICE=${{ secrets.QA_SERVICE }} >> ./envs/.env
+          echo IO_ENDPOINT=${{ secrets.QA_ENDPOINT }} >> ./envs/.env
+          echo STAGE="${{inputs.github-stage}}" >> ./envs/.env
+      - name: Run Payouts E2E test - ${{ inputs.github-stage }} Environment
+        if: always()
+        run: npm run test -- -t "@payouts and not (@ignore or @long-scenario)"
+
+  slack:
+    needs: [oauthTokenTest, accountsTest, vraTest, transactionsTest, payoutsTest]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
       - name: Notify fail
         if: failure()
         uses: act10ns/slack@v1
