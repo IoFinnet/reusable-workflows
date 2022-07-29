@@ -88,7 +88,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN_SEMANTIC_RELEASE_AND_NPM_REGISTRY }}
 
       - name: Run install
-        run: npm install
+        run: |
+         export NODE_OPTIONS="--max-old-space-size=${{ inputs.heap-size }}"
+         npm install
 
       # Serverless auth
       - name: Serverless authentication
