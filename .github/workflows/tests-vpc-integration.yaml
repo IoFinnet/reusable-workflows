@@ -18,6 +18,10 @@ on:
         required: true
        
     inputs:
+      heap-size:
+        default: "6144"
+        required: false
+        type: string
       deployment-repo:
         required: true
         type: string
